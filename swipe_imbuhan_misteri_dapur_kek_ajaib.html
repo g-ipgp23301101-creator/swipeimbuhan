@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SWIPE IMBUHAN: MISTERI DAPUR KEK AJAIB</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- MediaPipe Hand Landmarker via Vision Bundle CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js" crossorigin="anonymous"></script>
+
+    <style>
+        * {
+            font-family: 'Fredoka', 'Nunito', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1f0b2e 0%, #3a154c 35%, #5c1d63 70%, #2a083b 100%);
+            color: #fff;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* Glassmorphism Styles */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 240, 255, 0.4);
+            box-shadow: 0 10px 25px rgba(255, 105, 180, 0.25);
+        }
+
+        .neon-glow-pink {
+            box-shadow: 0 0 20px #ff71ce, inset 0 0 10px #ff71ce;
+        }
+
+        .neon-glow-purple {
+            box-shadow: 0 0 20px #b967ff, inset 0 0 10px #b967ff;
+        }
+
+        .neon-glow-gold {
+            box-shadow: 0 0 25px #ffd700, inset 0 0 12px #ffd700;
+        }
+
+        /* Animations */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-12px) rotate(2deg); }
+        }
+
+        .animate-float {
+            animation: float 4s ease-in-out infinite;
+        }
+
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 0.9; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.03); }
+        }
+
+        .animate-pulse-slow {
+            animation: pulse-slow 2.5s ease-in-out infinite;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-10px); }
+            40%, 80% { transform: translateX(10px); }
+        }
+
+        .animate-shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,182,193,0.5);
+            border-radius: 4px;
+        }
+
+        .drop-zone-active {
+            transform: scale(1.05);
+            border-color: #ffd700 !important;
+            box-shadow: 0 0 30px #ffd700 !important;
+        }
+
+        /* AR Interactive Camera Overlay Styling */
+        #camera-container {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 1.5rem;
+            overflow: hidden;
+            z-index: 5;
+        }
+
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror view for natural interaction */
+            filter: brightness(0.85) contrast(1.1);
+        }
+
+        #hand-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen relative overflow-hidden select-none">
+
+    <!-- Ambient Floating Particles / Stars Background -->
+    <div id="bg-particles" class="absolute inset-0 pointer-events-none z-0"></div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div id="app-container" class="relative z-10 flex flex-col justify-between min-h-screen p-3 md:p-6 max-w-7xl mx-auto w-full">
+
+        <!-- ==================== TOP NAVIGATION BAR ==================== -->
+        <header id="game-header" class="hidden glass-panel rounded-2xl p-3 mb-3 flex justify-between items-center text-white shadow-xl">
+            <div class="flex items-center space-x-3">
+                <div class="bg-gradient-to-r from-pink-500 to-purple-600 p-2 rounded-xl text-2xl shadow-lg animate-bounce">
+                    🍰
+                </div>
+                <div>
+                    <h1 class="text-lg md:text-xl font-bold tracking-wide text-pink-200">SWIPE IMBUHAN</h1>
+                    <div class="text-xs text-purple-200 font-semibold" id="mode-indicator-text">MOD: SENTUH & SERET</div>
+                </div>
+            </div>
+
+            <!-- Progress Bar & Question Counter -->
+            <div class="flex-1 max-w-md mx-4 hidden sm:block">
+                <div class="flex justify-between text-xs font-bold mb-1 text-pink-200">
+                    <span id="question-number-text">SOALAN 01/30</span>
+                    <span id="star-count-text">⭐ 0 BINTANG</span>
+                </div>
+                <div class="w-full bg-purple-950/60 rounded-full h-3.5 border border-pink-400/30 overflow-hidden p-0.5">
+                    <div id="progress-bar-fill" class="bg-gradient-to-r from-pink-400 via-purple-300 to-yellow-300 h-2.5 rounded-full transition-all duration-500 w-0"></div>
+                </div>
+            </div>
+
+            <!-- Teacher & Game Action Controls -->
+            <div class="flex items-center space-x-2">
+                <button id="btn-toggle-sound" onclick="toggleAudio()" class="p-2.5 bg-purple-800/80 hover:bg-purple-700 rounded-xl border border-purple-400/40 text-lg transition shadow">
+                    🔊
+                </button>
+                <button id="btn-switch-mode" onclick="openModeSwitchModal()" class="px-3 py-2 bg-indigo-600/80 hover:bg-indigo-500 rounded-xl border border-indigo-300 text-xs font-bold transition shadow hidden sm:inline-block">
+                    🔄 TUKAR MOD
+                </button>
+                <button id="btn-pause-game" onclick="pauseGame()" class="px-3 py-2 bg-amber-500/80 hover:bg-amber-400 rounded-xl border border-amber-200 text-xs font-bold transition shadow">
+                    ⏸️ JEDA
+                </button>
+                <button id="btn-end-game-top" onclick="confirmEndGame()" class="px-3 py-2 bg-red-600/90 hover:bg-red-500 rounded-xl border border-red-300 text-xs font-bold transition shadow-lg animate-pulse-slow">
+                    🛑 TAMATKAN PERMAINAN
+                </button>
+            </div>
+        </header>
+
+        <!-- ==================== SKRIN 1: MENU UTAMA ==================== -->
+        <section id="screen-main-menu" class="flex-1 flex flex-col justify-center items-center text-center py-6 px-4">
+            <!-- Hero Title Badge -->
+            <div class="inline-block px-4 py-1.5 bg-pink-500/30 border border-pink-300/40 rounded-full text-pink-200 text-sm font-semibold tracking-wider mb-4 animate-float">
+                ✨ MISTERI DAPUR KEK AJAIB ✨
+            </div>
+
+            <h1 class="text-4xl sm:text-6xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-300 via-purple-200 to-yellow-200 drop-shadow-lg mb-2">
+                SWIPE IMBUHAN
+            </h1>
+            <p class="text-lg sm:text-xl text-purple-200 max-w-2xl mb-6 font-medium">
+                Misi Mengelaskan Kata Berimbuhan Awalan & Akhiran di Dapur Kek Ajaib Tahun 5
+            </p>
+
+            <!-- Interactive Cake Illustration Display -->
+            <div class="relative w-48 h-48 sm:w-56 sm:h-56 my-2 flex items-center justify-center animate-float">
+                <div class="absolute inset-0 bg-pink-500/20 rounded-full blur-2xl animate-pulse"></div>
+                <div class="text-8xl sm:text-9xl filter drop-shadow-[0_10px_20px_rgba(255,105,180,0.5)]">
+                    🎂
+                </div>
+                <div class="absolute -top-2 -right-2 text-4xl animate-bounce">✨</div>
+                <div class="absolute -bottom-2 -left-2 text-4xl animate-bounce" style="animation-delay: 0.5s;">🧁</div>
+            </div>
+
+            <div class="my-3 inline-flex items-center px-4 py-2 bg-purple-900/60 border border-yellow-400/50 rounded-xl text-yellow-300 font-bold text-sm shadow-md">
+                🏆 30 CABARAN MENANTI KAMU!
+            </div>
+
+            <!-- Control Mode Selection Cards -->
+            <div class="w-full max-w-3xl my-6">
+                <h3 class="text-md font-bold text-pink-200 mb-3 uppercase tracking-wide">Sila Pilih Mod Kawalan Permainan:</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                    <!-- Mode A Card -->
+                    <div id="card-mode-ar" onclick="selectGameMode('AR')" class="glass-card p-4 rounded-2xl cursor-pointer border-2 border-transparent transition-all hover:scale-105 relative overflow-hidden group">
+                        <div class="flex items-center space-x-3">
+                            <div class="text-4xl p-2 bg-pink-500/30 rounded-xl">🖐️</div>
+                            <div>
+                                <h4 class="text-lg font-bold text-pink-200">MOD A: AR SWIPE TANGAN</h4>
+                                <p class="text-xs text-purple-200 mt-1">Gerakkan tangan di hadapan kamera untuk memilih jawapan secara ajaib.</p>
+                            </div>
+                        </div>
+                        <div id="badge-mode-ar" class="hidden absolute top-2 right-2 bg-yellow-400 text-purple-950 text-[10px] font-black px-2 py-0.5 rounded-full shadow">
+                            DIPILIH ✓
+                        </div>
+                    </div>
+
+                    <!-- Mode B Card -->
+                    <div id="card-mode-touch" onclick="selectGameMode('TOUCH')" class="glass-card p-4 rounded-2xl cursor-pointer border-2 border-transparent transition-all hover:scale-105 relative overflow-hidden group border-pink-400/80 neon-glow-pink">
+                        <div class="flex items-center space-x-3">
+                            <div class="text-4xl p-2 bg-purple-500/30 rounded-xl">👆</div>
+                            <div>
+                                <h4 class="text-lg font-bold text-purple-200">MOD B: SENTUH & SERET</h4>
+                                <p class="text-xs text-purple-200 mt-1">Sentuh kad perkataan dan seret ke kategori yang betul pada iPad/Smart Board.</p>
+                            </div>
+                        </div>
+                        <div id="badge-mode-touch" class="absolute top-2 right-2 bg-yellow-400 text-purple-950 text-[10px] font-black px-2 py-0.5 rounded-full shadow">
+                            DIPILIH ✓
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap justify-center gap-4 mt-2">
+                <button onclick="startGame()" class="px-8 py-4 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 hover:from-pink-400 hover:to-indigo-500 text-white font-extrabold text-xl rounded-2xl shadow-2xl border-2 border-pink-200/50 transform active:scale-95 transition-all neon-glow-pink flex items-center space-x-2">
+                    <span>🚀 MULA MISI</span>
+                </button>
+                <button onclick="openHowToPlayModal()" class="px-6 py-4 bg-purple-900/80 hover:bg-purple-800 text-pink-200 font-bold text-lg rounded-2xl border border-pink-300/30 shadow-lg transform active:scale-95 transition-all">
+                    📖 CARA BERMAIN
+                </button>
+            </div>
+        </section>
+
+
+        <!-- ==================== SKRIN 2: PERMAINAN UTAMA ==================== -->
+        <section id="screen-gameplay" class="hidden flex-1 flex flex-col justify-between items-center relative py-2">
+            
+            <!-- Target Drop Zones Header -->
+            <div class="w-full grid grid-cols-2 gap-3 md:gap-6 mb-2">
+                <!-- Kiri: Imbuhan Awalan -->
+                <div id="zone-awalan" class="glass-panel p-4 md:p-6 rounded-2xl border-2 border-pink-400/50 text-center transition-all flex flex-col items-center justify-center relative overflow-hidden group">
+                    <div class="text-3xl md:text-5xl mb-1">🧁</div>
+                    <h2 class="text-lg md:text-2xl font-black text-pink-200 tracking-wide">IMBUHAN AWALAN</h2>
+                    <p class="text-[11px] md:text-xs text-pink-300/80 font-semibold mt-0.5 sm:block hidden">⬅️ SWIPE / SERET KE KIRI</p>
+                    <div class="absolute inset-0 bg-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                </div>
+
+                <!-- Kanan: Imbuhan Akhiran -->
+                <div id="zone-akhiran" class="glass-panel p-4 md:p-6 rounded-2xl border-2 border-purple-400/50 text-center transition-all flex flex-col items-center justify-center relative overflow-hidden group">
+                    <div class="text-3xl md:text-5xl mb-1">🍰</div>
+                    <h2 class="text-lg md:text-2xl font-black text-purple-200 tracking-wide">IMBUHAN AKHIRAN</h2>
+                    <p class="text-[11px] md:text-xs text-purple-300/80 font-semibold mt-0.5 sm:block hidden">SERET KE KANAN ➡️</p>
+                    <div class="absolute inset-0 bg-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                </div>
+            </div>
+
+            <!-- Center Stage: Word Card Canvas & Camera Overlay -->
+            <div class="relative w-full max-w-xl my-auto flex flex-col items-center justify-center min-h-[280px] sm:min-h-[340px] rounded-3xl overflow-hidden p-2">
+                
+                <!-- Camera Feed Container (Used as Live Background in AR Mode) -->
+                <div id="camera-container" class="hidden absolute inset-0 rounded-3xl overflow-hidden border-2 border-pink-400/60 shadow-2xl bg-purple-950/80 backdrop-blur-sm">
+                    <video id="webcam" autoplay playsinline muted></video>
+                    <canvas id="hand-canvas"></canvas>
+                    
+                    <!-- Subtle Dark Overlay for Legibility -->
+                    <div class="absolute inset-0 bg-gradient-to-b from-purple-950/40 via-transparent to-purple-950/60 pointer-events-none"></div>
+
+                    <!-- AR Status Badge -->
+                    <div id="ar-status-badge" class="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-yellow-300 border border-yellow-400/40 flex items-center space-x-2 z-20 shadow-lg">
+                        <span class="w-2.5 h-2.5 rounded-full bg-green-400 animate-ping"></span>
+                        <span id="ar-status-text">Mencari Tangan...</span>
+                    </div>
+                </div>
+
+                <!-- Main Word Card -->
+                <div id="main-word-card" class="glass-card w-full max-w-md p-6 sm:p-8 rounded-3xl text-center shadow-2xl border-4 border-yellow-300/80 cursor-grab active:cursor-grabbing relative z-20 transition-transform duration-200 touch-none flex flex-col items-center justify-center min-h-[200px]">
+                    <div class="text-xs font-bold text-yellow-300 tracking-widest uppercase mb-1 drop-shadow">KATA BERIMBUHAN</div>
+                    <div id="card-word-text" class="text-4xl sm:text-5xl font-black text-white tracking-wider my-2 drop-shadow-lg">
+                        ---
+                    </div>
+                    <div id="card-hint-text" class="text-xs sm:text-sm text-pink-200 font-bold mt-1 drop-shadow">
+                        Seret atau swipe kad ini ke kategori jawapan!
+                    </div>
+                </div>
+
+                <!-- No Hand Warning Message overlay for AR Mode -->
+                <div id="ar-no-hand-msg" class="hidden absolute bottom-3 bg-red-900/90 text-red-200 border border-red-400/50 px-4 py-2 rounded-xl text-xs font-bold shadow-lg animate-bounce z-30 text-center">
+                    🖐️ TANGAN TIDAK DIKESAN — LETAKKAN TANGAN DI HADAPAN KAMERA
+                </div>
+            </div>
+
+            <!-- Responsive Instruction Helper Footer -->
+            <div id="instruction-footer" class="text-center text-xs sm:text-sm text-purple-200 font-semibold bg-purple-950/50 px-4 py-2 rounded-full border border-purple-400/30 my-2">
+                💡 Sentuh kad perkataan dan seret ke zon <span class="text-pink-300 font-bold">AWALAN</span> atau <span class="text-purple-300 font-bold">AKHIRAN</span>.
+            </div>
+
+            <!-- Feedback Overlay Panel (Locks gameplay until 'SETERUSNYA' is tapped) -->
+            <div id="feedback-panel" class="hidden absolute inset-0 bg-black/75 backdrop-blur-md z-40 rounded-3xl p-6 flex flex-col items-center justify-center text-center animate-pulse-slow">
+                <div id="feedback-icon" class="text-6xl sm:text-7xl mb-2 animate-bounce">🎉</div>
+                <h3 id="feedback-title" class="text-2xl sm:text-3xl font-black text-yellow-300 mb-1">HEBAT! JAWAPAN KAMU BETUL!</h3>
+                
+                <div class="glass-panel p-4 rounded-2xl max-w-lg my-3 w-full border-pink-300/40 text-left space-y-2">
+                    <p class="text-sm font-bold text-pink-200">Perkataan: <span id="feedback-word" class="text-white font-extrabold text-base"></span></p>
+                    <p class="text-sm font-bold text-pink-200">Kategori: <span id="feedback-category" class="text-yellow-300 font-extrabold"></span></p>
+                    <p class="text-sm font-bold text-pink-200">Imbuhan: <span id="feedback-prefix" class="text-purple-200 font-extrabold"></span></p>
+                    <hr class="border-purple-400/30 my-1">
+                    <p id="feedback-explanation" class="text-xs sm:text-sm text-purple-100 font-medium leading-relaxed"></p>
+                </div>
+
+                <button id="btn-next-question" onclick="nextQuestion()" class="mt-2 px-8 py-3.5 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-purple-950 font-black text-lg sm:text-xl rounded-2xl shadow-xl border-2 border-yellow-200 transform active:scale-95 transition-all flex items-center space-x-2 animate-pulse">
+                    <span>SETERUSNYA ➜</span>
+                </button>
+            </div>
+        </section>
+
+
+        <!-- ==================== SKRIN 3: KEPUTUSAN PERMAINAN ==================== -->
+        <section id="screen-results" class="hidden flex-1 flex flex-col justify-center items-center text-center py-6 px-4">
+            <div class="glass-panel p-6 sm:p-8 rounded-3xl max-w-2xl w-full border-2 border-pink-300/40 shadow-2xl relative overflow-hidden">
+                <div class="text-6xl mb-2 animate-bounce" id="result-emoji">🏆</div>
+                <h2 id="result-title" class="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-200 to-purple-200 mb-1">
+                    TAHNIAH, CHEF IMBUHAN!
+                </h2>
+                <div id="result-badge" class="inline-block px-4 py-1.5 bg-yellow-400 text-purple-950 font-black text-sm rounded-full shadow my-2">
+                    MASTER CHEF IMBUHAN
+                </div>
+
+                <!-- Detailed Statistics Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 my-6">
+                    <div class="bg-purple-900/50 p-3 rounded-xl border border-purple-400/30">
+                        <div class="text-xs text-purple-300 font-bold">DIJAWAB</div>
+                        <div id="stat-answered" class="text-xl sm:text-2xl font-black text-white">0/30</div>
+                    </div>
+                    <div class="bg-purple-900/50 p-3 rounded-xl border border-purple-400/30">
+                        <div class="text-xs text-green-300 font-bold">BETUL</div>
+                        <div id="stat-correct" class="text-xl sm:text-2xl font-black text-green-400">0</div>
+                    </div>
+                    <div class="bg-purple-900/50 p-3 rounded-xl border border-purple-400/30">
+                        <div class="text-xs text-red-300 font-bold">SALAH</div>
+                        <div id="stat-wrong" class="text-xl sm:text-2xl font-black text-red-400">0</div>
+                    </div>
+                    <div class="bg-purple-900/50 p-3 rounded-xl border border-purple-400/30">
+                        <div class="text-xs text-yellow-300 font-bold">KETEPATAN</div>
+                        <div id="stat-accuracy" class="text-xl sm:text-2xl font-black text-yellow-300">0%</div>
+                    </div>
+                </div>
+
+                <div class="bg-purple-950/60 p-4 rounded-2xl border border-purple-400/30 text-left text-xs sm:text-sm space-y-1.5 mb-6">
+                    <p class="flex justify-between font-semibold"><span class="text-pink-200">⭐ Jumlah Bintang Diperoleh:</span> <span id="stat-stars" class="text-yellow-300 font-bold">0</span></p>
+                    <p class="flex justify-between font-semibold"><span class="text-pink-200">🧁 Imbuhan Awalan Betul:</span> <span id="stat-awalan-correct" class="text-pink-300 font-bold">0/15</span></p>
+                    <p class="flex justify-between font-semibold"><span class="text-pink-200">🍰 Imbuhan Akhiran Betul:</span> <span id="stat-akhiran-correct" class="text-purple-300 font-bold">0/15</span></p>
+                    <p class="flex justify-between font-semibold"><span class="text-pink-200">❓ Soalan Belum Dijawab:</span> <span id="stat-unanswered" class="text-gray-300 font-bold">0</span></p>
+                </div>
+
+                <!-- Result Action Buttons -->
+                <div class="flex flex-wrap justify-center gap-4">
+                    <button onclick="restartGame()" class="px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white font-black text-base rounded-2xl shadow-lg border border-pink-200/40 transition transform active:scale-95">
+                        🔄 MAIN SEMULA
+                    </button>
+                    <button onclick="returnToMainMenu()" class="px-6 py-3 bg-purple-900/80 hover:bg-purple-800 text-pink-200 font-bold text-base rounded-2xl border border-pink-300/30 shadow-lg transition transform active:scale-95">
+                        🏠 KEMBALI KE MENU
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- ==================== MODAL OVERLAYS ==================== -->
+
+    <!-- Modal 1: Confirmation End Game by Teacher -->
+    <div id="modal-confirm-end" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="glass-panel p-6 rounded-3xl max-w-md w-full text-center border-2 border-red-400/50 shadow-2xl">
+            <div class="text-5xl mb-3">⚠️</div>
+            <h3 class="text-2xl font-black text-white mb-2">ADAKAH ANDA PASTI MAHU MENAMATKAN PERMAINAN?</h3>
+            <p class="text-xs text-purple-200 mb-6">Keputusan sesi permainan semasa akan dikira mengikut soalan yang telah dijawab sahaja.</p>
+            
+            <div class="flex justify-center space-x-3">
+                <button onclick="closeEndGameModal()" class="px-5 py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold text-sm rounded-xl transition">
+                    TERUSKAN BERMAIN
+                </button>
+                <button onclick="forceEndGame()" class="px-5 py-3 bg-red-600 hover:bg-red-500 text-white font-black text-sm rounded-xl shadow-lg transition">
+                    YA, TAMATKAN
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 2: Pause Menu Overlay -->
+    <div id="modal-pause" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="glass-panel p-6 rounded-3xl max-w-md w-full text-center border-2 border-amber-400/50 shadow-2xl">
+            <div class="text-5xl mb-3">⏸️</div>
+            <h3 class="text-3xl font-black text-yellow-300 mb-4">PERMAINAN DIJEDA</h3>
+            
+            <div class="flex flex-col space-y-3">
+                <button onclick="resumeGame()" class="py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-black text-base rounded-xl shadow-lg transition">
+                    ▶️ SAMBUNG BERMAIN
+                </button>
+                <button onclick="repeatQuestion()" class="py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm rounded-xl shadow transition">
+                    🔁 ULANG SOALAN
+                </button>
+                <button onclick="confirmEndGame()" class="py-3 bg-red-600/80 hover:bg-red-500 text-white font-bold text-sm rounded-xl shadow transition">
+                    🛑 TAMATKAN PERMAINAN
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 3: How to Play Instructions -->
+    <div id="modal-how-to-play" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="glass-panel p-6 rounded-3xl max-w-lg w-full text-left border-2 border-pink-300/40 shadow-2xl relative max-h-[85vh] overflow-y-auto">
+            <h3 class="text-2xl font-black text-yellow-300 mb-3 flex items-center justify-between">
+                <span>📖 CARA BERMAIN</span>
+                <button onclick="closeHowToPlayModal()" class="text-lg text-pink-300 hover:text-white">✖</button>
+            </h3>
+            
+            <div class="space-y-3 text-xs sm:text-sm text-purple-100">
+                <p>1. **Objektif**: Kelaskan 30 kata berimbuhan kepada kategori **Imbuhan Awalan** atau **Imbuhan Akhiran**.</p>
+                <p>2. **Mod AR Swipe Tangan**:
+                   <br>- Berdiri/duduk di hadapan kamera.
+                   <br>- Swipe / gerakkan tangan ke **KIRI** untuk <span class="text-pink-300 font-bold">Imbuhan Awalan</span>.
+                   <br>- Swipe / gerakkan tangan ke **KANAN** untuk <span class="text-purple-300 font-bold">Imbuhan Akhiran</span>.</p>
+                <p>3. **Mod Sentuh & Seret**:
+                   <br>- Sentuh kad perkataan dan seret ke sebelah kiri atau kanan pada skrin iPad / Smart Board.</p>
+                <p>4. **Penerusan Soalan**: Selepas menjawab, baca penerangan ringkas dan tekan butang <span class="text-yellow-300 font-bold">SETERUSNYA ➜</span> untuk soalan berikutnya.</p>
+                <p>5. **Kawalan Guru**: Guru boleh menekan butang **JEDA** atau **TAMATKAN PERMAINAN** pada bila-bila masa semasa PdP.</p>
+            </div>
+
+            <button onclick="closeHowToPlayModal()" class="mt-5 w-full py-3 bg-pink-500 hover:bg-pink-400 text-white font-bold text-sm rounded-xl transition">
+                FAHAM & TUTUP
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal 4: Mid-Game Mode Switch -->
+    <div id="modal-switch-mode" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="glass-panel p-6 rounded-3xl max-w-md w-full text-center border-2 border-indigo-400/50 shadow-2xl">
+            <h3 class="text-2xl font-black text-white mb-4">TUKAR MOD KAWALAN</h3>
+            <div class="space-y-3 mb-5">
+                <button onclick="executeModeSwitch('TOUCH')" class="w-full p-3 bg-purple-800/80 hover:bg-purple-700 rounded-xl border border-purple-400 text-left font-bold text-sm flex items-center space-x-3">
+                    <span class="text-2xl">👆</span>
+                    <div>
+                        <div>MOD B: SENTUH & SERET</div>
+                        <div class="text-[10px] text-purple-300 font-normal">Gunakan skrin sentuh iPad / Smart Board</div>
+                    </div>
+                </button>
+                <button onclick="executeModeSwitch('AR')" class="w-full p-3 bg-pink-800/80 hover:bg-pink-700 rounded-xl border border-pink-400 text-left font-bold text-sm flex items-center space-x-3">
+                    <span class="text-2xl">🖐️</span>
+                    <div>
+                        <div>MOD A: AR SWIPE TANGAN</div>
+                        <div class="text-[10px] text-pink-300 font-normal">Gunakan kamera & pergerakan tangan</div>
+                    </div>
+                </button>
+            </div>
+            <button onclick="closeModeSwitchModal()" class="px-5 py-2 bg-gray-700 text-white text-xs font-bold rounded-lg">
+                BATAL
+            </button>
+        </div>
+    </div>
+
+
+    <!-- ==================== JAVASCRIPT GAME LOGIC ==================== -->
+    <script>
+        /* ==========================================================================
+           1. GAME DATA BANK (EXACT 30 QUESTIONS: 15 PREFIX & 15 SUFFIX)
+           ========================================================================== */
+        const QUESTION_BANK = [
+            // Kata Berimbuhan Awalan (15)
+            { word: "memasak", category: "AWALAN", prefix: "awalan meN-", explanation: "Perkataan 'memasak' menerima imbuhan awalan meN- pada kata dasar 'masak'." },
+            { word: "membuat", category: "AWALAN", prefix: "awalan meN-", explanation: "Perkataan 'membuat' menerima imbuhan awalan meN- pada kata dasar 'buat'." },
+            { word: "menjual", category: "AWALAN", prefix: "awalan meN-", explanation: "Perkataan 'menjual' menerima imbuhan awalan meN- pada kata dasar 'jual'." },
+            { word: "membeli", category: "AWALAN", prefix: "awalan meN-", explanation: "Perkataan 'membeli' menerima imbuhan awalan meN- pada kata dasar 'beli'." },
+            { word: "membungkus", category: "AWALAN", prefix: "awalan meN-", explanation: "Perkataan 'membungkus' menerima imbuhan awalan meN- pada kata dasar 'bungkus'." },
+            { word: "menghias", category: "AWALAN", prefix: "awalan meN-", explanation: "Perkataan 'menghias' menerima imbuhan awalan meN- pada kata dasar 'hias'." },
+            { word: "berusaha", category: "AWALAN", prefix: "awalan ber-", explanation: "Perkataan 'berusaha' menerima imbuhan awalan ber- pada kata dasar 'usaha'." },
+            { word: "berniaga", category: "AWALAN", prefix: "awalan ber-", explanation: "Perkataan 'berniaga' menerima imbuhan awalan ber- pada kata dasar 'niaga'." },
+            { word: "berjaya", category: "AWALAN", prefix: "awalan ber-", explanation: "Perkataan 'berjaya' menerima imbuhan awalan ber- pada kata dasar 'jaya'." },
+            { word: "terpilih", category: "AWALAN", prefix: "awalan ter-", explanation: "Perkataan 'terpilih' menerima imbuhan awalan ter- pada kata dasar 'pilih'." },
+            { word: "terkenal", category: "AWALAN", prefix: "awalan ter-", explanation: "Perkataan 'terkenal' menerima imbuhan awalan ter- pada kata dasar 'kenal'." },
+            { word: "diperiksa", category: "AWALAN", prefix: "awalan diper-", explanation: "Perkataan 'diperiksa' menerima imbuhan awalan diper- pada kata dasar 'periksa'." },
+            { word: "dihasilkan", category: "AWALAN", prefix: "awalan di-", explanation: "Perkataan 'dihasilkan' menerima imbuhan awalan di- pada kata dasar 'hasil'." },
+            { word: "penyedia", category: "AWALAN", prefix: "awalan peN-", explanation: "Perkataan 'penyedia' menerima imbuhan awalan peN- pada kata dasar 'sedia'." },
+            { word: "pengusaha", category: "AWALAN", prefix: "awalan peN-", explanation: "Perkataan 'pengusaha' menerima imbuhan awalan peN- pada kata dasar 'usaha'." },
+
+            // Kata Berimbuhan Akhiran (15)
+            { word: "makanan", category: "AKHIRAN", prefix: "akhiran -an", explanation: "Perkataan 'makanan' menerima imbuhan akhiran -an pada kata dasar 'makan'." },
+            { word: "minuman", category: "AKHIRAN", prefix: "akhiran -an", explanation: "Perkataan 'minuman' menerima imbuhan akhiran -an pada kata dasar 'minum'." },
+            { word: "jualan", category: "AKHIRAN", prefix: "akhiran -an", explanation: "Perkataan 'jualan' menerima imbuhan akhiran -an pada kata dasar 'jual'." },
+            { word: "masakan", category: "AKHIRAN", prefix: "akhiran -an", explanation: "Perkataan 'masakan' menerima imbuhan akhiran -an pada kata dasar 'masak'." },
+            { word: "hidangan", category: "AKHIRAN", prefix: "akhiran -an", explanation: "Perkataan 'hidangan' menerima imbuhan akhiran -an pada kata dasar 'hidang'." },
+            { word: "kiriman", category: "AKHIRAN", prefix: "akhiran -an", explanation: "Perkataan 'kiriman' menerima imbuhan akhiran -an pada kata dasar 'kirim'." },
+            { word: "tulisan", category: "AKHIRAN", prefix: "akhiran -an", explanation: "Perkataan 'tulisan' menerima imbuhan akhiran -an pada kata dasar 'tulis'." },
+            { word: "lukisan", category: "AKHIRAN", prefix: "akhiran -an", explanation: "Perkataan 'lukisan' menerima imbuhan akhiran -an pada kata dasar 'lukis'." },
+            { word: "jahitan", category: "AKHIRAN", prefix: "akhiran -an", explanation: "Perkataan 'jahitan' menerima imbuhan akhiran -an pada kata dasar 'jahit'." },
+            { word: "senyuman", category: "AKHIRAN", prefix: "akhiran -an", explanation: "Perkataan 'senyuman' menerima imbuhan akhiran -an pada kata dasar 'senyum'." },
+            { word: "baiki", category: "AKHIRAN", prefix: "akhiran -i", explanation: "Perkataan 'baiki' menerima imbuhan akhiran -i pada kata dasar 'baik'." },
+            { word: "akhiri", category: "AKHIRAN", prefix: "akhiran -i", explanation: "Perkataan 'akhiri' menerima imbuhan akhiran -i pada kata dasar 'akhir'." },
+            { word: "warnai", category: "AKHIRAN", prefix: "akhiran -i", explanation: "Perkataan 'warnai' menerima imbuhan akhiran -i pada kata dasar 'warna'." },
+            { word: "gunakan", category: "AKHIRAN", prefix: "akhiran -kan", explanation: "Perkataan 'gunakan' menerima imbuhan akhiran -kan pada kata dasar 'guna'." },
+            { word: "siapkan", category: "AKHIRAN", prefix: "akhiran -kan", explanation: "Perkataan 'siapkan' menerima imbuhan akhiran -kan pada kata dasar 'siap'." }
+        ];
+
+        /* ==========================================================================
+           2. GLOBAL STATE VARIABLES
+           ========================================================================== */
+        let gameMode = 'TOUCH'; // 'TOUCH' or 'AR'
+        let currentQuestions = [];
+        let currentIndex = 0;
+        let scoreStars = 0;
+        let correctCount = 0;
+        let wrongCount = 0;
+        let awalanCorrect = 0;
+        let akhiranCorrect = 0;
+        let isAnswerLocked = false;
+        let isGamePaused = false;
+        let audioMuted = false;
+
+        // AR / MediaPipe Tracker Variables
+        let handLandmarker = null;
+        let webcamStream = null;
+        let arAnimationId = null;
+        let lastHandX = null;
+        let swipeThreshold = 0.15; // Normalized screen width movement
+        let isArCooldown = false;
+
+        // Sound Synthesizer via Web Audio API
+        let audioCtx = null;
+
+        /* ==========================================================================
+           3. WEB AUDIO API SYNTHESIZER (NO EXTERNAL AUDIO FILES)
+           ========================================================================== */
+        function initAudioContext() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (audioMuted) return;
+            try {
+                initAudioContext();
+                const now = audioCtx.currentTime;
+
+                if (type === 'correct') {
+                    // Happy Bell Arpeggio
+                    [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                        gain.gain.setValueAtTime(0.3, now + idx * 0.08);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.3);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.08);
+                        osc.stop(now + idx * 0.08 + 0.3);
+                    });
+                } else if (type === 'wrong') {
+                    // Soft low tone error
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.exponentialRampToValueAtTime(110, now + 0.3);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'swipe') {
+                    // Whoosh sound
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(600, now + 0.15);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'victory') {
+                    // Victory Fanfare
+                    [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+                        gain.gain.setValueAtTime(0.3, now + idx * 0.12);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.5);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.12);
+                        osc.stop(now + idx * 0.12 + 0.5);
+                    });
+                }
+            } catch (e) {
+                console.log("Audio play error:", e);
+            }
+        }
+
+        function toggleAudio() {
+            audioMuted = !audioMuted;
+            document.getElementById('btn-toggle-sound').innerText = audioMuted ? '🔇' : '🔊';
+        }
+
+        /* ==========================================================================
+           4. INITIALIZATION & MENU NAVIGATION
+           ========================================================================== */
+        window.onload = function() {
+            generateBgParticles();
+            initDragAndDrop();
+        };
+
+        function generateBgParticles() {
+            const container = document.getElementById('bg-particles');
+            container.innerHTML = '';
+            for (let i = 0; i < 25; i++) {
+                const star = document.createElement('div');
+                star.className = 'absolute text-yellow-200/40 pointer-events-none animate-float';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.fontSize = (Math.random() * 16 + 10) + 'px';
+                star.style.animationDuration = (Math.random() * 5 + 3) + 's';
+                star.innerText = ['✨', '⭐', '🌸', '🧁'][Math.floor(Math.random() * 4)];
+                container.appendChild(star);
+            }
+        }
+
+        function selectGameMode(mode) {
+            gameMode = mode;
+            const cardAr = document.getElementById('card-mode-ar');
+            const cardTouch = document.getElementById('card-mode-touch');
+            const badgeAr = document.getElementById('badge-mode-ar');
+            const badgeTouch = document.getElementById('badge-mode-touch');
+
+            if (mode === 'AR') {
+                cardAr.classList.add('border-pink-400/80', 'neon-glow-pink');
+                badgeAr.classList.remove('hidden');
+                cardTouch.classList.remove('border-pink-400/80', 'neon-glow-pink');
+                badgeTouch.classList.add('hidden');
+            } else {
+                cardTouch.classList.add('border-pink-400/80', 'neon-glow-pink');
+                badgeTouch.classList.remove('hidden');
+                cardAr.classList.remove('border-pink-400/80', 'neon-glow-pink');
+                badgeAr.classList.add('hidden');
+            }
+            playSound('swipe');
+        }
+
+        function startGame() {
+            initAudioContext();
+            // Shuffle 30 questions randomly for this session
+            currentQuestions = [...QUESTION_BANK].sort(() => Math.random() - 0.5);
+            currentIndex = 0;
+            scoreStars = 0;
+            correctCount = 0;
+            wrongCount = 0;
+            awalanCorrect = 0;
+            akhiranCorrect = 0;
+            isAnswerLocked = false;
+            isGamePaused = false;
+
+            document.getElementById('screen-main-menu').classList.add('hidden');
+            document.getElementById('screen-results').classList.add('hidden');
+            document.getElementById('screen-gameplay').classList.remove('hidden');
+            document.getElementById('game-header').classList.remove('hidden');
+
+            updateHeaderStats();
+
+            if (gameMode === 'AR') {
+                initArCamera();
+                document.getElementById('mode-indicator-text').innerText = "MOD: 🖐️ AR SWIPE TANGAN";
+                document.getElementById('instruction-footer').innerHTML = "💡 Lakukan gesture swipe tangan ke <span class='text-pink-300 font-bold'>KIRI (Awalan)</span> atau <span class='text-purple-300 font-bold'>KANAN (Akhiran)</span>.";
+            } else {
+                stopArCamera();
+                document.getElementById('mode-indicator-text').innerText = "MOD: 👆 SENTUH & SERET";
+                document.getElementById('instruction-footer').innerHTML = "💡 Sentuh kad perkataan dan seret ke zon <span class='text-pink-300 font-bold'>AWALAN</span> atau <span class='text-purple-300 font-bold'>AKHIRAN</span>.";
+            }
+
+            loadQuestion(currentIndex);
+        }
+
+        /* ==========================================================================
+           5. GAMEPLAY LOGIC & QUESTION MANAGEMENT
+           ========================================================================== */
+        function loadQuestion(index) {
+            if (index >= currentQuestions.length) {
+                showFinalResults(true);
+                return;
+            }
+
+            isAnswerLocked = false;
+            document.getElementById('feedback-panel').classList.add('hidden');
+            
+            const q = currentQuestions[index];
+            const cardWord = document.getElementById('card-word-text');
+            const card = document.getElementById('main-word-card');
+
+            // Reset Card Position & Animation
+            card.style.transform = 'translate(0px, 0px) rotate(0deg)';
+            card.className = "glass-card w-full max-w-md p-6 sm:p-8 rounded-3xl text-center shadow-2xl border-4 border-yellow-300/70 cursor-grab active:cursor-grabbing relative z-20 transition-transform duration-200 touch-none flex flex-col items-center justify-center min-h-[200px]";
+            
+            cardWord.innerText = q.word;
+            updateHeaderStats();
+        }
+
+        function updateHeaderStats() {
+            document.getElementById('question-number-text').innerText = `SOALAN ${String(currentIndex + 1).padStart(2, '0')}/30`;
+            document.getElementById('star-count-text').innerText = `⭐ ${scoreStars} BINTANG`;
+            const progressPercent = ((currentIndex) / 30) * 100;
+            document.getElementById('progress-bar-fill').style.width = `${progressPercent}%`;
+        }
+
+        function processAnswer(selectedCategory) {
+            if (isAnswerLocked || isGamePaused) return;
+            isAnswerLocked = true;
+
+            const q = currentQuestions[currentIndex];
+            const isCorrect = (selectedCategory === q.category);
+
+            if (isCorrect) {
+                scoreStars++;
+                correctCount++;
+                if (q.category === 'AWALAN') awalanCorrect++;
+                if (q.category === 'AKHIRAN') akhiranCorrect++;
+                playSound('correct');
+                
+                // Visual Highlight on Drop Zone
+                const zone = selectedCategory === 'AWALAN' ? document.getElementById('zone-awalan') : document.getElementById('zone-akhiran');
+                zone.classList.add('neon-glow-gold');
+                setTimeout(() => zone.classList.remove('neon-glow-gold'), 1200);
+
+            } else {
+                wrongCount++;
+                playSound('wrong');
+                document.getElementById('main-word-card').classList.add('animate-shake');
+            }
+
+            // Display Feedback Overlay
+            showFeedbackPanel(isCorrect, q);
+        }
+
+        function showFeedbackPanel(isCorrect, q) {
+            const panel = document.getElementById('feedback-panel');
+            const icon = document.getElementById('feedback-icon');
+            const title = document.getElementById('feedback-title');
+            const btnNext = document.getElementById('btn-next-question');
+
+            if (isCorrect) {
+                icon.innerText = "🎉";
+                title.innerText = "HEBAT! JAWAPAN KAMU BETUL!";
+                title.className = "text-2xl sm:text-3xl font-black text-yellow-300 mb-1";
+            } else {
+                icon.innerText = "💡";
+                title.innerText = "OPS! JOM BELAJAR LAGI!";
+                title.className = "text-2xl sm:text-3xl font-black text-pink-300 mb-1";
+            }
+
+            document.getElementById('feedback-word').innerText = q.word;
+            document.getElementById('feedback-category').innerText = q.category === 'AWALAN' ? 'IMBUHAN AWALAN' : 'IMBUHAN AKHIRAN';
+            document.getElementById('feedback-prefix').innerText = q.prefix;
+            document.getElementById('feedback-explanation').innerText = q.explanation;
+
+            if (currentIndex === 29) {
+                btnNext.innerHTML = "<span>LIHAT KEPUTUSAN 🏆</span>";
+            } else {
+                btnNext.innerHTML = "<span>SETERUSNYA ➜</span>";
+            }
+
+            panel.classList.remove('hidden');
+        }
+
+        function nextQuestion() {
+            playSound('swipe');
+            currentIndex++;
+            if (currentIndex < 30) {
+                loadQuestion(currentIndex);
+            } else {
+                showFinalResults(true);
+            }
+        }
+
+        /* ==========================================================================
+           6. TOUCH / DRAG & DROP INTERACTION SYSTEM (IPAD SAFARI COMPATIBLE)
+           ========================================================================== */
+        let isDragging = false;
+        let startX = 0, startY = 0;
+        let currentX = 0, currentY = 0;
+
+        function initDragAndDrop() {
+            const card = document.getElementById('main-word-card');
+
+            card.addEventListener('pointerdown', (e) => {
+                if (isAnswerLocked || gameMode !== 'TOUCH') return;
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                card.setPointerCapture(e.pointerId);
+                card.style.transition = 'none';
+            });
+
+            card.addEventListener('pointermove', (e) => {
+                if (!isDragging || isAnswerLocked || gameMode !== 'TOUCH') return;
+                currentX = e.clientX - startX;
+                currentY = e.clientY - startY;
+                
+                const rotate = currentX * 0.05;
+                card.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${rotate}deg)`;
+
+                // Visual Hover Feedback on Zones
+                if (currentX < -80) {
+                    document.getElementById('zone-awalan').classList.add('drop-zone-active');
+                    document.getElementById('zone-akhiran').classList.remove('drop-zone-active');
+                } else if (currentX > 80) {
+                    document.getElementById('zone-akhiran').classList.add('drop-zone-active');
+                    document.getElementById('zone-awalan').classList.remove('drop-zone-active');
+                } else {
+                    document.getElementById('zone-awalan').classList.remove('drop-zone-active');
+                    document.getElementById('zone-akhiran').classList.remove('drop-zone-active');
+                }
+            });
+
+            const handleDragEnd = (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                card.style.transition = 'transform 0.3s ease';
+
+                document.getElementById('zone-awalan').classList.remove('drop-zone-active');
+                document.getElementById('zone-akhiran').classList.remove('drop-zone-active');
+
+                // Check Threshold
+                if (currentX < -110) {
+                    processAnswer('AWALAN');
+                } else if (currentX > 110) {
+                    processAnswer('AKHIRAN');
+                } else {
+                    // Reset card back to center
+                    card.style.transform = 'translate(0px, 0px) rotate(0deg)';
+                }
+                currentX = 0;
+                currentY = 0;
+            };
+
+            card.addEventListener('pointerup', handleDragEnd);
+            card.addEventListener('pointercancel', handleDragEnd);
+
+            // Tap Fallback directly on Target Zones for accessibility
+            document.getElementById('zone-awalan').addEventListener('click', () => {
+                if (gameMode === 'TOUCH' && !isAnswerLocked) processAnswer('AWALAN');
+            });
+            document.getElementById('zone-akhiran').addEventListener('click', () => {
+                if (gameMode === 'TOUCH' && !isAnswerLocked) processAnswer('AKHIRAN');
+            });
+        }
+
+        /* ==========================================================================
+           7. MEDIAPIPE AR HAND TRACKING SYSTEM
+           ========================================================================== */
+        async function initArCamera() {
+            const cameraContainer = document.getElementById('camera-container');
+            const arStatusText = document.getElementById('ar-status-text');
+            const video = document.getElementById('webcam');
+            const noHandMsg = document.getElementById('ar-no-hand-msg');
+
+            cameraContainer.classList.remove('hidden');
+            arStatusText.innerText = "Memuatkan Kamera AR...";
+
+            try {
+                // Initialize MediaPipe HandLandmarker Tasks Vision safely
+                if (!handLandmarker) {
+                    const visionBundle = window.tasksVision || window.vision || window;
+                    
+                    if (visionBundle && visionBundle.FilesetResolver && visionBundle.HandLandmarker) {
+                        const filesetResolver = await visionBundle.FilesetResolver.forVisionTasks(
+                            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+                        );
+                        handLandmarker = await visionBundle.HandLandmarker.createFromOptions(filesetResolver, {
+                            baseOptions: {
+                                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+                                delegate: "GPU"
+                            },
+                            runningMode: "VIDEO",
+                            numHands: 1
+                        });
+                    }
+                }
+
+                arStatusText.innerText = "Meminta Kebenaran Kamera...";
+                
+                // Flexible Camera Constraints for Mobile/iPad & Laptops
+                const constraints = {
+                    video: {
+                        facingMode: "user",
+                        width: { ideal: 1280, max: 1920 },
+                        height: { ideal: 720, max: 1080 }
+                    }
+                };
+
+                webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = webcamStream;
+                
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        resolve();
+                    };
+                });
+
+                arStatusText.innerText = "Kamera Aktif — Tunjukkan Tangan";
+                predictWebcamLoop();
+
+            } catch (err) {
+                console.error("Camera Access / Model Error:", err);
+                arStatusText.innerText = "Kamera Tidak Dapat Dibuka!";
+                noHandMsg.classList.remove('hidden');
+                
+                // Inform teacher/student why camera failed
+                if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                    noHandMsg.innerHTML = "⚠️ PERHATIAN: Kamera memerlukan sambungan <b>HTTPS</b> pada iPad Safari.<br>Pertukaran automatik ke Mod Sentuh...";
+                } else {
+                    noHandMsg.innerHTML = "⚠️ KEBENARAN KAMERA DIHALANG / TIDAK DIJUMPAI.<br>Bertukar ke Mod Sentuh dalam 3 saat...";
+                }
+
+                setTimeout(() => {
+                    executeModeSwitch('TOUCH');
+                    noHandMsg.classList.add('hidden');
+                }, 3500);
+            }
+        }
+
+        async function predictWebcamLoop() {
+            const video = document.getElementById('webcam');
+            const canvas = document.getElementById('hand-canvas');
+            const ctx = canvas.getContext('2d');
+            const arStatusText = document.getElementById('ar-status-text');
+            const noHandMsg = document.getElementById('ar-no-hand-msg');
+
+            if (video.videoWidth > 0 && video.videoHeight > 0) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+            }
+
+            let lastVideoTime = -1;
+            
+            async function renderFrame() {
+                if (gameMode !== 'AR' || !webcamStream) return;
+
+                if (video.currentTime !== lastVideoTime && handLandmarker) {
+                    lastVideoTime = video.currentTime;
+                    let startTimeMs = performance.now();
+                    const results = await handLandmarker.detectForVideo(video, startTimeMs);
+
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    if (results.landmarks && results.landmarks.length > 0) {
+                        noHandMsg.classList.add('hidden');
+                        arStatusText.innerText = "Tangan Dikesan ✓";
+
+                        const landmarks = results.landmarks[0];
+                        
+                        // Draw skeletal connections and fingertips for visual AR effect
+                        const indexTip = landmarks[8];
+                        const x = indexTip.x * canvas.width;
+                        const y = indexTip.y * canvas.height;
+
+                        // Draw glowing hand pointer target
+                        ctx.beginPath();
+                        ctx.arc(x, y, 22, 0, 2 * Math.PI);
+                        ctx.fillStyle = "rgba(255, 113, 206, 0.6)";
+                        ctx.strokeStyle = "#ffd700";
+                        ctx.lineWidth = 4;
+                        ctx.shadowColor = "#ff71ce";
+                        ctx.shadowBlur = 15;
+                        ctx.fill();
+                        ctx.stroke();
+
+                        // Wrist / Middle MCP for tracking swipes (landmarks[9] is Middle Finger MCP)
+                        const handCenterX = landmarks[9].x; 
+                        const card = document.getElementById('main-word-card');
+
+                        // Process Swipe Logic:
+                        // Normalized handCenterX: 0 = screen left, 1 = screen right.
+                        // Because the video/canvas is mirrored with transform: scaleX(-1):
+                        // Physical gesture to user's LEFT = landmark X goes > 0.65 (AWALAN)
+                        // Physical gesture to user's RIGHT = landmark X goes < 0.35 (AKHIRAN)
+                        if (!isAnswerLocked && !isArCooldown) {
+                            if (handCenterX > 0.65) {
+                                // Moved physical hand to LEFT -> AWALAN
+                                document.getElementById('zone-awalan').classList.add('drop-zone-active');
+                                triggerArSwipe('AWALAN');
+                            } else if (handCenterX < 0.35) {
+                                // Moved physical hand to RIGHT -> AKHIRAN
+                                document.getElementById('zone-akhiran').classList.add('drop-zone-active');
+                                triggerArSwipe('AKHIRAN');
+                            } else {
+                                // Center neutral zone
+                                document.getElementById('zone-awalan').classList.remove('drop-zone-active');
+                                document.getElementById('zone-akhiran').classList.remove('drop-zone-active');
+                                card.style.transform = `translate(${(0.5 - handCenterX) * 200}px, 0px)`;
+                            }
+                        }
+
+                    } else {
+                        noHandMsg.classList.remove('hidden');
+                        arStatusText.innerText = "Mencari Tangan...";
+                        lastHandX = null;
+                    }
+                }
+
+                arAnimationId = requestAnimationFrame(renderFrame);
+            }
+
+            renderFrame();
+        }
+
+        function triggerArSwipe(category) {
+            isArCooldown = true;
+            const card = document.getElementById('main-word-card');
+            card.style.transition = 'transform 0.4s ease';
+            
+            if (category === 'AWALAN') {
+                card.style.transform = 'translate(-280px, 0px) rotate(-15deg)';
+            } else {
+                card.style.transform = 'translate(280px, 0px) rotate(15deg)';
+            }
+
+            setTimeout(() => {
+                document.getElementById('zone-awalan').classList.remove('drop-zone-active');
+                document.getElementById('zone-akhiran').classList.remove('drop-zone-active');
+                processAnswer(category);
+                isArCooldown = false;
+            }, 300);
+        }
+
+        function stopArCamera() {
+            if (arAnimationId) {
+                cancelAnimationFrame(arAnimationId);
+                arAnimationId = null;
+            }
+            if (webcamStream) {
+                webcamStream.getTracks().forEach(track => track.stop());
+                webcamStream = null;
+            }
+            document.getElementById('camera-container').classList.add('hidden');
+            document.getElementById('ar-no-hand-msg').classList.add('hidden');
+        }
+
+        /* ==========================================================================
+           8. TEACHER CONTROLS: PAUSE, REPEAT & EARLY END GAME
+           ========================================================================== */
+        function pauseGame() {
+            if (isGamePaused) return;
+            isGamePaused = true;
+            document.getElementById('modal-pause').classList.remove('hidden');
+        }
+
+        function resumeGame() {
+            isGamePaused = false;
+            document.getElementById('modal-pause').classList.add('hidden');
+        }
+
+        function repeatQuestion() {
+            isGamePaused = false;
+            document.getElementById('modal-pause').classList.add('hidden');
+            if (!isAnswerLocked) {
+                loadQuestion(currentIndex);
+            }
+        }
+
+        function confirmEndGame() {
+            document.getElementById('modal-confirm-end').classList.remove('hidden');
+        }
+
+        function closeEndGameModal() {
+            document.getElementById('modal-confirm-end').classList.add('hidden');
+        }
+
+        function forceEndGame() {
+            document.getElementById('modal-confirm-end').classList.add('hidden');
+            document.getElementById('modal-pause').classList.add('hidden');
+            stopArCamera();
+            showFinalResults(false);
+        }
+
+        function openModeSwitchModal() {
+            document.getElementById('modal-switch-mode').classList.remove('hidden');
+        }
+
+        function closeModeSwitchModal() {
+            document.getElementById('modal-switch-mode').classList.add('hidden');
+        }
+
+        function executeModeSwitch(newMode) {
+            closeModeSwitchModal();
+            gameMode = newMode;
+            selectGameMode(newMode);
+            
+            if (gameMode === 'AR') {
+                initArCamera();
+                document.getElementById('mode-indicator-text').innerText = "MOD: 🖐️ AR SWIPE TANGAN";
+                document.getElementById('instruction-footer').innerHTML = "💡 Lakukan gesture swipe tangan ke <span class='text-pink-300 font-bold'>KIRI (Awalan)</span> atau <span class='text-purple-300 font-bold'>KANAN (Akhiran)</span>.";
+            } else {
+                stopArCamera();
+                document.getElementById('mode-indicator-text').innerText = "MOD: 👆 SENTUH & SERET";
+                document.getElementById('instruction-footer').innerHTML = "💡 Sentuh kad perkataan dan seret ke zon <span class='text-pink-300 font-bold'>AWALAN</span> atau <span class='text-purple-300 font-bold'>AKHIRAN</span>.";
+            }
+        }
+
+        function openHowToPlayModal() {
+            document.getElementById('modal-how-to-play').classList.remove('hidden');
+        }
+
+        function closeHowToPlayModal() {
+            document.getElementById('modal-how-to-play').classList.add('hidden');
+        }
+
+        /* ==========================================================================
+           9. RESULTS CALCULATION & RESTART
+           ========================================================================== */
+        function showFinalResults(completedAll) {
+            stopArCamera();
+            document.getElementById('screen-gameplay').classList.add('hidden');
+            document.getElementById('game-header').classList.add('hidden');
+            document.getElementById('screen-results').classList.remove('hidden');
+
+            const totalAnswered = correctCount + wrongCount;
+            const unanswered = 30 - totalAnswered;
+            const accuracy = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
+
+            document.getElementById('stat-answered').innerText = `${totalAnswered}/30`;
+            document.getElementById('stat-correct').innerText = correctCount;
+            document.getElementById('stat-wrong').innerText = wrongCount;
+            document.getElementById('stat-accuracy').innerText = `${accuracy}%`;
+            document.getElementById('stat-stars').innerText = `${scoreStars} ⭐`;
+            document.getElementById('stat-awalan-correct').innerText = `${awalanCorrect}/15`;
+            document.getElementById('stat-akhiran-correct').innerText = `${akhiranCorrect}/15`;
+            document.getElementById('stat-unanswered').innerText = unanswered;
+
+            const titleElem = document.getElementById('result-title');
+            const badgeElem = document.getElementById('result-badge');
+            const emojiElem = document.getElementById('result-emoji');
+
+            if (!completedAll) {
+                emojiElem.innerText = "⏹️";
+                titleElem.innerText = "MISI DIHENTIKAN OLEH GURU";
+                badgeElem.innerText = "SESI TAMAT";
+                badgeElem.className = "inline-block px-4 py-1.5 bg-purple-600 text-white font-black text-sm rounded-full shadow my-2";
+            } else {
+                playSound('victory');
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                
+                emojiElem.innerText = "🏆";
+                titleElem.innerText = "TAHNIAH, CHEF IMBUHAN!";
+
+                if (scoreStars >= 25) {
+                    badgeElem.innerText = "🌟 MASTER CHEF IMBUHAN";
+                    badgeElem.className = "inline-block px-4 py-1.5 bg-yellow-400 text-purple-950 font-black text-sm rounded-full shadow my-2";
+                } else if (scoreStars >= 15) {
+                    badgeElem.innerText = "🎓 CHEF BIJAK";
+                    badgeElem.className = "inline-block px-4 py-1.5 bg-pink-400 text-purple-950 font-black text-sm rounded-full shadow my-2";
+                } else {
+                    badgeElem.innerText = "🧁 CHEF JUNIOR";
+                    badgeElem.className = "inline-block px-4 py-1.5 bg-purple-400 text-purple-950 font-black text-sm rounded-full shadow my-2";
+                }
+            }
+        }
+
+        function restartGame() {
+            startGame();
+        }
+
+        function returnToMainMenu() {
+            stopArCamera();
+            document.getElementById('screen-results').classList.add('hidden');
+            document.getElementById('screen-gameplay').classList.add('hidden');
+            document.getElementById('game-header').classList.add('hidden');
+            document.getElementById('screen-main-menu').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
